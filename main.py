@@ -8,6 +8,7 @@ class Gate:
         self.qubits = qubits
         self.label = label
 
+# This function will check if gate is dependent on gate_prev
 def are_dependencies(gate_prev, gate):
     qubits1 = gate_prev.qubits
     qubits2 = gate.qubits
@@ -16,6 +17,7 @@ def are_dependencies(gate_prev, gate):
     else:
         return False
 
+#This function will create a dependency graph between the gates
 def create_dependency_graph(circuit):
     graph = {}
     for gate in circuit:
@@ -31,6 +33,8 @@ def create_dependency_graph(circuit):
                 graph[gate.label].add(gate_prev.label)
     return graph
 
+# This function will create the distance matrix for the physical topology 
+# using Floyd-Warshall algorithm
 def create_distance_matrix(topology):
     n = len(topology)
     dist = [[math.inf for _ in range(n)] for _ in range(n)]
@@ -45,6 +49,7 @@ def create_distance_matrix(topology):
                     dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j])
     return dist
 
+# This function is responsible to create the two layers F and E
 def create_layers(circuit, dependency_graph, executed_list):
     layer_F = []
     layer_E = []
@@ -58,6 +63,7 @@ def create_layers(circuit, dependency_graph, executed_list):
     
     return layer_F, layer_E
 
+# This will return the computed heuristic function ofor the inputted SWAP pair
 def heuristic_function(layer_F, layer_E, weight, distance_matrix, decay, current_mapping, swapped_qubit_pair):
     length_F = len(layer_F)
     length_E = max(1, len(layer_E))
@@ -78,23 +84,21 @@ def heuristic_function(layer_F, layer_E, weight, distance_matrix, decay, current
 
     return H
 
+# This is the main algorithm which will return the minimum swap count to execute the circuit
 def sabre_swap_algorithm(circuit, layer_F, layer_E, current_mapping, distance_matrix, dependency_graph, topology, delta):
-    print('--------')
     swap_count = 0
     n = len(topology)
-    executed_gates = []
-    executed_gate_labels = []
+    executed_gates = [] # List of all gates that are already executed
+    executed_gate_labels = [] 
     while layer_F:
         decay = [1] * n
-        execute_gate_list = []
+        execute_gate_list = [] # List of gates that can be executed now
         for gate in layer_F:
             qubits = gate.qubits
             if distance_matrix[current_mapping[qubits[0]]][current_mapping[qubits[1]]] == 1:
                 executed_gates.append(gate)
                 executed_gate_labels.append(gate.label)
                 execute_gate_list.append(gate)
-            print(gate.label)
-        print(executed_gate_labels)
         if execute_gate_list:
             for gate in execute_gate_list:
                 layer_F.remove(gate)
@@ -140,18 +144,17 @@ def sabre_swap_algorithm(circuit, layer_F, layer_E, current_mapping, distance_ma
                 temp_mapping[swaps[1]] = current_mapping[swaps[0]]
                 h_score = heuristic_function(layer_F, layer_E, 0.1, distance_matrix, decay, temp_mapping, swaps)
                 h_score_dict[tuple(swaps)] = h_score
-            print(h_score_dict)
             min_score_swap = min(h_score_dict, key=h_score_dict.get)
-            print(min_score_swap)
             temp_value = current_mapping[min_score_swap[0]]
             current_mapping[min_score_swap[0]] = current_mapping[min_score_swap[1]]
             current_mapping[min_score_swap[1]] = temp_value
             swap_count += 1
             decay[min_score_swap[0]] += delta
             decay[min_score_swap[1]] += delta
-            print('-------------Used SWAP here----------------')
     return current_mapping, swap_count
 
+# This function is used to tweak the mappings with a small amount 
+# so as to avoid local minima
 def tweak_mapping_random(current_mapping, topology, tweaking_parameter):
     new_mapping = copy.deepcopy(current_mapping)
     n = len(topology)
@@ -169,6 +172,7 @@ def tweak_mapping_random(current_mapping, topology, tweaking_parameter):
     
     return new_mapping
 
+# This function is used to generate the reversed circuit
 def generate_reverse_circuit(circuit):
     new_circuit = []
     for gate in circuit:
@@ -176,6 +180,7 @@ def generate_reverse_circuit(circuit):
     
     return new_circuit
 
+# This function is used to generate random initial mapping
 def generate_random_mapping(topology):
     n = len(topology)
     random_qubit_list = random.sample(range(n), n)
@@ -211,9 +216,7 @@ if __name__ == "__main__":
     for i in range(100):
         if reverse_flag == False:
             dependency_graph = create_dependency_graph(circuit)
-            print(dependency_graph)
             current_initial_mapping = copy.deepcopy(initial_mapping)
-            print(current_initial_mapping)
             layer_F, layer_E = create_layers(circuit, dependency_graph, [])
             new_mapping, swap_count = sabre_swap_algorithm(circuit, layer_F, layer_E, initial_mapping, 
                         distance_matrix, dependency_graph, topology, delta)
@@ -233,7 +236,6 @@ if __name__ == "__main__":
         else:
             dependency_graph = create_dependency_graph(reverse_circuit)
             current_initial_mapping = copy.deepcopy(initial_mapping)
-            print(current_initial_mapping)
             layer_F, layer_E = create_layers(reverse_circuit, dependency_graph, [])
             new_mapping, swap_count = sabre_swap_algorithm(reverse_circuit, layer_F, layer_E, initial_mapping, 
                         distance_matrix, dependency_graph, topology, delta)
